@@ -833,14 +833,7 @@ footer{padding:70px 0 30px; background:var(--section); border-top:1px solid var(
         </datalist>
       </div>
       <div class="field full"><label>Reference Link <span style="font-weight:400; color:var(--text-soft);">(optional — Drive, YouTube, portfolio, etc.)</span></label>
-        <input type="url" name="reference_link" autocomplete="off" placeholder="https://...">
-      </div>
-      <div class="field full">
-        <label>Attach Files <span style="font-weight:400; color:var(--text-soft);">(optional — photos, videos, PDFs, docs, zips)</span></label>
-        <label class="file-drop" id="fileDropLabel" for="attachmentInput">
-          <span id="fileDropText">＋ Click to attach files, or drag &amp; drop</span>
-        </label>
-        <input type="file" name="attachment" id="attachmentInput" multiple accept="image/*,video/*,.pdf,.doc,.docx,.zip,.rar,.txt,.xls,.xlsx,.ppt,.pptx" style="display:none;">
+        <input type="url" name="reference_link" autocomplete="off" placeholder="https://... (paste a Google Drive / Dropbox link here if you need to share files)">
       </div>
       <div class="field full"><label>Project Details</label><textarea name="details" required></textarea><span class="field-err">Tell me a bit about your project</span></div>
       <div class="submit-row">
@@ -1449,11 +1442,6 @@ function validateForm(){
 
 /* Build a nicely formatted, human-readable message from the form fields.
    Used for both the email draft and the WhatsApp message. */
-function getAttachmentSummary(){
-  const input = document.getElementById('attachmentInput');
-  if(!input || !input.files || !input.files.length) return '-';
-  return Array.from(input.files).map(f=>`${f.name} (${(f.size/1024/1024).toFixed(2)}MB)`).join(', ');
-}
 function buildInquiryMessage(d){
   return `Hi Sifat,
 
@@ -1465,7 +1453,6 @@ You've received a new project inquiry from your website.
 📱 Phone: ${d.phone||'-'}
 💰 Budget: ${d.budget||'-'}
 🔗 Reference Link: ${d.reference_link||'-'}
-📎 Attached Files: ${getAttachmentSummary()}
 
 📝 Project Details:
 ${d.details||'-'}
@@ -1483,37 +1470,14 @@ try{
   if(savedEmail && emailInput) emailInput.value = savedEmail;
 }catch(err){ /* localStorage unavailable — safe to ignore */ }
 
-/* ---- File attach UI (click or drag & drop) ---- */
-const attachmentInput = document.getElementById('attachmentInput');
-const fileDropLabel = document.getElementById('fileDropLabel');
-const fileDropText = document.getElementById('fileDropText');
-function refreshFileDropText(){
-  if(!attachmentInput.files.length){
-    fileDropText.textContent = '＋ Click to attach files, or drag & drop';
-    fileDropLabel.classList.remove('has-files');
-    return;
-  }
-  const names = Array.from(attachmentInput.files).map(f=>f.name).join(', ');
-  fileDropText.textContent = `✓ ${attachmentInput.files.length} file(s) attached: ${names}`;
-  fileDropLabel.classList.add('has-files');
-}
-if(attachmentInput){
-  attachmentInput.addEventListener('change', refreshFileDropText);
-  ['dragover','dragenter'].forEach(evt=>fileDropLabel.addEventListener(evt, e=>{ e.preventDefault(); fileDropLabel.classList.add('dragover'); }));
-  ['dragleave','drop'].forEach(evt=>fileDropLabel.addEventListener(evt, e=>{ e.preventDefault(); fileDropLabel.classList.remove('dragover'); }));
-  fileDropLabel.addEventListener('drop', e=>{
-    if(e.dataTransfer.files.length){ attachmentInput.files = e.dataTransfer.files; refreshFileDropText(); }
-  });
-}
-
 /* ===================== EMAILJS SETUP =====================
    1) Sign up free at https://www.emailjs.com
    2) Email Services -> Add New Service -> connect your Gmail -> copy the "Service ID"
    3) Email Templates -> Create New Template -> paste the HTML template shown below
       (use the same variable names: {{from_name}}, {{company}}, {{from_email}}, {{phone}},
-      {{budget}}, {{details}}, {{subject}}, {{to_email}}) -> copy the "Template ID"
-      Attachments require a paid EmailJS plan with "Attachments" enabled on the template —
-      on the free plan the file still shows up as a filename inside the message text below.
+      {{budget}}, {{reference_link}}, {{details}}, {{subject}}, {{to_email}}) -> copy the "Template ID"
+      No file attachments are sent — visitors share files via a link in "Reference Link"
+      instead, since real attachments need a paid EmailJS plan.
    4) Account -> General -> copy your "Public Key"
    5) Paste all 3 values below. That's it — no backend needed.
 */
@@ -1535,13 +1499,10 @@ form.addEventListener('submit', async (e)=>{
   form.querySelector('[name="from_name"]').value = d.name || '-';
   form.querySelector('[name="from_email"]').value = d.email || '-';
   form.querySelector('[name="subject"]').value = `New project inquiry from ${d.name || 'your website'}`;
-  // fold reference link + attachment names into details so they always reach the email,
-  // even on EmailJS plans that don't support real file attachments
+  // fold reference link into details so it always reaches the email
   const detailsInput = form.querySelector('[name="details"]');
   const extra = [];
   if(d.reference_link) extra.push(`🔗 Reference Link: ${d.reference_link}`);
-  const attSummary = getAttachmentSummary();
-  if(attSummary !== '-') extra.push(`📎 Attached Files: ${attSummary}`);
   const originalDetails = detailsInput.value;
   if(extra.length) detailsInput.value = `${originalDetails}\n\n${extra.join('\n')}`;
 
@@ -1553,7 +1514,6 @@ form.addEventListener('submit', async (e)=>{
       localStorage.setItem('sa_contact_email', d.email || '');
     }catch(err){ /* ignore */ }
     form.reset();
-    refreshFileDropText();
     // restore remembered name/email right after reset so they don't get wiped
     try{
       const nameInput = form.querySelector('[name="name"]');
